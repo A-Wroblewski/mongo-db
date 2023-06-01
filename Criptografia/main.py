@@ -25,10 +25,12 @@ def chat():
 
         friend = available_names[0]
 
-        chosen_option = input(f'\nVocê está conectado como: {chosen_name}.\n'
-                            f'{chosen_name}, o que deseja fazer?\n'
+        chosen_option = input(f'\nVocê se conectou como: {chosen_name}.\n'
+                            f'{chosen_name}, o que deseja fazer?\n\n'
                             f'A) Enviar uma mensagem secreta para {friend}.\n'
                             'B) Ler as mensagens que estão no banco. ')
+
+        if chosen_option.lower() == 'q': break
 
         if chosen_option.lower() == 'a':
             message = input(f'\nOk {chosen_name}, digite a mensagem: ')
@@ -50,12 +52,10 @@ def chat():
                 'message': encrypted_message,
                 })
 
-            print(f'\n{chosen_name}, sua mensagem foi gravada no banco.')
+            print(f'{chosen_name}, sua mensagem foi gravada no banco.\n')
             available_names.append(chosen_name)
 
         elif chosen_option.lower() == 'b':
-            print(f'\nOlá {chosen_name}, essas são as mensagens que você recebeu:\n')
-
             received_messages = []
 
             # passa um for em todos os documentos da coleção contendo
@@ -65,39 +65,58 @@ def chat():
             for info_dict in messages.find({'to': chosen_name}, {'message': True, '_id': False}):
                 received_messages.append(*info_dict.values())
 
+            if not received_messages:
+                print('\nVocê não recebeu nenhuma mensagem.\n')
+                available_names.append(chosen_name)
+                continue
+
+            print(f'\nOlá {chosen_name}, essas são as mensagens que você recebeu:\n')
+
             counter = 1
 
-            for message in received_messages:
-                print(f'{counter}) {message}', end='\n')
+            for msg in received_messages:
+                print(f'{counter}) {msg}', end='\n')
                 counter += 1
 
             print()
 
             chosen_message = int(input('Quer ler qual mensagem? '))
-
-            chosen_message_index = received_messages[chosen_message - 1]
+            chosen_message = received_messages[chosen_message - 1]
 
             print()
 
             ask_secret_code = input('Qual é o código secreto? ')
 
+            # erro aqui no caso de 2 códigos diferentes...
+            # caso uma mensagem seja enviada e outro código secreto seja escolhido,
+            # a mensagem enviada com o código antigo vai dar erro se ele for o novo
             if ask_secret_code == secret_code:
-                decrypted_message = fernet.decrypt(chosen_message_index).decode('utf-8')
+                decrypted_message = fernet.decrypt(chosen_message).decode('utf-8')
 
-                print(f'\nMensagem descriptografada: {decrypted_message}')
+                messages.update_one(
+                    {'message': chosen_message},
+                    {'$set': {'wasRead': True}}
+                )
 
-            else: print('Código errado.')
+                print(f'\nMensagem descriptografada: {decrypted_message}\n')
+
+            else: print('Código errado.\n')
 
             available_names.append(chosen_name)
 
-        else: print('\nOpção inválida.')
+        else:
+            print('\nOpção inválida.\n')
+            available_names.append(chosen_name)
 
 
-conn_str = 'mongodb+srv://user:password@cluster0.dzwrbs1.mongodb.net/?retryWrites=true&w=majority'
+connection_string = 'mongodb+srv://user:password@cluster0.dzwrbs1.mongodb.net/?retryWrites=true&w=majority'
 
-client = pymongo.MongoClient(conn_str)
+mongo_client = pymongo.MongoClient(connection_string)
 
-db = client.Chat
+if 'Chat' in mongo_client.list_database_names():
+    mongo_client.drop_database('Chat')
+
+db = mongo_client.Chat
 
 messages = db.Messages
 

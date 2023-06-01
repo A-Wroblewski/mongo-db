@@ -44,5 +44,4 @@ while True:
             print('\nTerminating process...')
             break
 
-        case _:
-            print('\nInvalid option.\n')
+        case _: print('\nInvalid option.\n')
